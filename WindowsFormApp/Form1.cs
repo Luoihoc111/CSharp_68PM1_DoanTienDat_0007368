@@ -7,10 +7,6 @@ namespace WindowsFormApp
             InitializeComponent();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
 
         private void label1_Click(object sender, EventArgs e)
         {
@@ -27,25 +23,32 @@ namespace WindowsFormApp
 
         }
 
+
+
+
         private void button1_Click(object sender, EventArgs e)
         {
             string username = txtUsername.Text;
             string password = txtPassword.Text;
 
-            
             string emailSinhVien = "0007368@st.huce.edu.vn";
             string mssv = "0007368";
 
-            if (username == emailSinhVien && password == mssv)
+            if (txtUsername.Text == emailSinhVien && txtPassword.Text == mssv)
             {
-                MessageBox.Show("Đăng nhập thành công!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Form2 formQuanLy = new Form2();
+                formQuanLy.Show();
+                this.Hide();
             }
             else
             {
-                MessageBox.Show("Đăng nhập thất bại!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Đăng nhập thất bại! Vui lòng kiểm tra lại tài khoản hoặc mật khẩu.", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
