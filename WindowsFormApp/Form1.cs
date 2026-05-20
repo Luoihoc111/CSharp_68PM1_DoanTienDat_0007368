@@ -36,9 +36,10 @@ namespace WindowsFormApp
 
             if (txtUsername.Text == emailSinhVien && txtPassword.Text == mssv)
             {
-                Form2 formQuanLy = new Form2();
-                formQuanLy.Show();
+                MainForm mainForm = new MainForm();
+                mainForm.Show();
                 this.Hide();
+
             }
             else
             {
