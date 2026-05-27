@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -7,72 +6,86 @@ namespace WindowsFormApp
 {
     public partial class UCQuanLySinhVien : UserControl
     {
-        private List<SinhVien> _dsSinhVien = new List<SinhVien>();
-        private List<string> _dsLopHoc = new List<string>();
         private int _trangHienTai = 1;
         private const int _soDoiMoiTrang = 10;
-        private List<SinhVien> _dsHienThi = new List<SinhVien>();
-        private bool _dangThem = false;   // true = thêm mới, false = sửa
+        private bool _dangThem = false;
 
         public UCQuanLySinhVien()
         {
             InitializeComponent();
-            TaoDuLieuMau();
             LoadLopVaoComboBox();
-            HienThiDanhSach(_dsSinhVien);
+            LoadData();
             DatTrangThaiForm(false);
         }
 
         // ══════════════════════════════════════════════
-        //  DỮ LIỆU MẪU
+        //  LOAD COMBOBOX BẰNG LINQ
         // ══════════════════════════════════════════════
-        private void TaoDuLieuMau()
-        {
-            _dsLopHoc.AddRange(new[] { "68PM1", "68PM2", "68PM3" });
-
-            _dsSinhVien.Add(new SinhVien { MaSV = "1", HoTen = "Doan Tien Dat",  GioiTinh = "Nam", NgaySinh = new DateTime(2026, 2, 17), Lop = "68PM1" });
-            _dsSinhVien.Add(new SinhVien { MaSV = "2", HoTen = "Nguyen Van A",   GioiTinh = "Nam", NgaySinh = new DateTime(2026, 3, 11), Lop = "68PM2" });
-            _dsSinhVien.Add(new SinhVien { MaSV = "3", HoTen = "Tran Thi B",     GioiTinh = "Nữ",  NgaySinh = new DateTime(2005, 5, 20), Lop = "68PM1" });
-        }
-
         private void LoadLopVaoComboBox()
         {
             comboBox2.Items.Clear();
-            foreach (var lop in _dsLopHoc)
-                comboBox2.Items.Add(lop);
+            using (var db = new AppDbContext())
+            {
+                var dsLop = db.LopHocs.Select(l => l.malop).ToList();
+                foreach (var lop in dsLop)
+                {
+                    comboBox2.Items.Add(lop);
+                }
+            }
             if (comboBox2.Items.Count > 0)
                 comboBox2.SelectedIndex = 0;
         }
 
         // ══════════════════════════════════════════════
-        //  HIỂN THỊ DANH SÁCH (có phân trang)
+        //  HIỂN THỊ DANH SÁCH (LINQ + Phân trang tại DB)
         // ══════════════════════════════════════════════
-        private void HienThiDanhSach(List<SinhVien> ds)
+        private void LoadData(string keyword = "")
         {
-            _dsHienThi = ds;
-            int tongBanGhi = ds.Count;
-            int tongTrang = (int)Math.Ceiling((double)tongBanGhi / _soDoiMoiTrang);
-            if (tongTrang == 0) tongTrang = 1;
-            if (_trangHienTai > tongTrang) _trangHienTai = tongTrang;
-            if (_trangHienTai < 1) _trangHienTai = 1;
-
-            int batDau = (_trangHienTai - 1) * _soDoiMoiTrang;
-            int ketThuc = Math.Min(batDau + _soDoiMoiTrang, tongBanGhi);
-
-            dataGridView1.Rows.Clear();
-            for (int i = batDau; i < ketThuc; i++)
+            using (var db = new AppDbContext())
             {
-                var sv = ds[i];
-                dataGridView1.Rows.Add(sv.MaSV, sv.HoTen, sv.GioiTinh,
-                    sv.NgaySinh.ToString("dd/MM/yyyy"), sv.Lop);
-            }
+                var query = db.SinhViens.AsQueryable();
 
-            label7.Text = $"Trang {_trangHienTai}/{tongTrang}  |  {tongBanGhi} bản ghi";
+                // Lọc dữ liệu bằng LINQ nếu có từ khóa tìm kiếm
+                if (!string.IsNullOrEmpty(keyword))
+                {
+                    keyword = keyword.ToLower();
+                    query = query.Where(s => s.hoten.ToLower().Contains(keyword)
+                                          || s.id.ToString().Contains(keyword)
+                                          || s.malop.ToLower().Contains(keyword));
+                }
+
+                int tongBanGhi = query.Count();
+                int tongTrang = (int)Math.Ceiling((double)tongBanGhi / _soDoiMoiTrang);
+                if (tongTrang == 0) tongTrang = 1;
+
+                // Đảm bảo trang hiện tại hợp lệ
+                if (_trangHienTai > tongTrang) _trangHienTai = tongTrang;
+                if (_trangHienTai < 1) _trangHienTai = 1;
+
+                int skip = (_trangHienTai - 1) * _soDoiMoiTrang;
+
+                // Lấy dữ liệu theo phân trang
+                var dsHienThi = query.OrderBy(s => s.id)
+                                     .Skip(skip)
+                                     .Take(_soDoiMoiTrang)
+                                     .ToList();
+
+                dataGridView1.Rows.Clear();
+                foreach (var sv in dsHienThi)
+                {
+                    dataGridView1.Rows.Add(
+                        sv.id.ToString(),
+                        sv.hoten,
+                        sv.gioitinh,
+                        sv.ngaysinh?.ToString("dd/MM/yyyy") ?? "",
+                        sv.malop
+                    );
+                }
+
+                label7.Text = $"Trang {_trangHienTai}/{tongTrang}  |  {tongBanGhi} bản ghi";
+            }
         }
 
-        // ══════════════════════════════════════════════
-        //  CHỌN HÀNG TRÊN GRID → ĐIỀN VÀO FORM
-        // ══════════════════════════════════════════════
         private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -84,7 +97,9 @@ namespace WindowsFormApp
             if (DateTime.TryParseExact(row.Cells["colNgaySinh"].Value?.ToString(),
                 "dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None, out DateTime ngay))
+            {
                 dateTimePicker1.Value = ngay;
+            }
 
             string lop = row.Cells["colLop"].Value?.ToString();
             int idx = comboBox2.Items.IndexOf(lop);
@@ -94,27 +109,27 @@ namespace WindowsFormApp
         }
 
         // ══════════════════════════════════════════════
-        //  THÊM
+        //  THÊM, SỬA, XÓA, LƯU DỮ LIỆU
         // ══════════════════════════════════════════════
         private void btnThem_Click(object sender, EventArgs e)
         {
             ResetForm();
-            textBox1.Text = ((_dsSinhVien.Count > 0
-                ? int.Parse(_dsSinhVien.Max(s => s.MaSV)) : 0) + 1).ToString();
+            using (var db = new AppDbContext())
+            {
+                // Vì bảng SQL tbl_sinhviens không tự tăng ID, ta dùng LINQ tìm ID lớn nhất cộng 1
+                int maxId = db.SinhViens.Any() ? db.SinhViens.Max(s => s.id) : 0;
+                textBox1.Text = (maxId + 1).ToString();
+            }
             _dangThem = true;
             DatTrangThaiForm(true);
             textBox2.Focus();
         }
 
-        // ══════════════════════════════════════════════
-        //  SỬA
-        // ══════════════════════════════════════════════
         private void btnSua_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrEmpty(textBox1.Text))
             {
-                MessageBox.Show("Vui lòng chọn sinh viên cần sửa!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng chọn sinh viên cần sửa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
             _dangThem = false;
@@ -122,15 +137,11 @@ namespace WindowsFormApp
             textBox2.Focus();
         }
 
-        // ══════════════════════════════════════════════
-        //  XÓA
-        // ══════════════════════════════════════════════
         private void btnXoa_Click(object sender, EventArgs e)
         {
-            if (string.IsNullOrEmpty(textBox1.Text))
+            if (string.IsNullOrEmpty(textBox1.Text) || !int.TryParse(textBox1.Text, out int idCanXoa))
             {
-                MessageBox.Show("Vui lòng chọn sinh viên cần xóa!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng chọn sinh viên cần xóa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
@@ -139,116 +150,85 @@ namespace WindowsFormApp
                 "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
                 return;
 
-            string maSV = textBox1.Text;
-            var sv = _dsSinhVien.FirstOrDefault(s => s.MaSV == maSV);
-            if (sv != null)
+            using (var db = new AppDbContext())
             {
-                _dsSinhVien.Remove(sv);
-                MessageBox.Show("Xóa sinh viên thành công!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-                ResetForm();
-                _trangHienTai = 1;
-                HienThiDanhSach(_dsSinhVien);
+                var sv = db.SinhViens.Find(idCanXoa); // Dùng LINQ Find
+                if (sv != null)
+                {
+                    db.SinhViens.Remove(sv);
+                    db.SaveChanges(); // Áp dụng xuống CSDL
+                    MessageBox.Show("Xóa sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    ResetForm();
+                    _trangHienTai = 1;
+                    LoadData(textBox3.Text.Trim());
+                }
             }
         }
 
-        // ══════════════════════════════════════════════
-        //  LƯU (nút Lưu chỉ hiện khi đang thêm/sửa)
-        // ══════════════════════════════════════════════
         private void btnLuu_Click(object sender, EventArgs e)
         {
             if (string.IsNullOrWhiteSpace(textBox2.Text))
             {
-                MessageBox.Show("Vui lòng nhập họ và tên!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Vui lòng nhập họ và tên!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 textBox2.Focus(); return;
             }
 
-            if (_dangThem)
+            using (var db = new AppDbContext())
             {
-                _dsSinhVien.Add(new SinhVien
+                if (_dangThem)
                 {
-                    MaSV     = textBox1.Text,
-                    HoTen    = textBox2.Text.Trim(),
-                    GioiTinh = comboBox1.Text,
-                    NgaySinh = dateTimePicker1.Value,
-                    Lop      = comboBox2.Text
-                });
-                MessageBox.Show("Thêm sinh viên thành công!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            else
-            {
-                var sv = _dsSinhVien.FirstOrDefault(s => s.MaSV == textBox1.Text);
-                if (sv != null)
-                {
-                    sv.HoTen    = textBox2.Text.Trim();
-                    sv.GioiTinh = comboBox1.Text;
-                    sv.NgaySinh = dateTimePicker1.Value;
-                    sv.Lop      = comboBox2.Text;
+                    var svMoi = new SinhVien
+                    {
+                        id = int.Parse(textBox1.Text),
+                        hoten = textBox2.Text.Trim(),
+                        gioitinh = comboBox1.Text,
+                        ngaysinh = dateTimePicker1.Value,
+                        malop = comboBox2.Text
+                    };
+                    db.SinhViens.Add(svMoi);
+                    MessageBox.Show("Thêm sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
-                MessageBox.Show("Cập nhật sinh viên thành công!", "Thông báo",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else
+                {
+                    int idSua = int.Parse(textBox1.Text);
+                    var sv = db.SinhViens.Find(idSua);
+                    if (sv != null)
+                    {
+                        sv.hoten = textBox2.Text.Trim();
+                        sv.gioitinh = comboBox1.Text;
+                        sv.ngaysinh = dateTimePicker1.Value;
+                        sv.malop = comboBox2.Text;
+                        MessageBox.Show("Cập nhật sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+                db.SaveChanges(); // Áp dụng thay đổi xuống SQL Server
             }
 
-            ResetForm();
-            _trangHienTai = 1;
-            HienThiDanhSach(_dsSinhVien);
             DatTrangThaiForm(false);
+            LoadData(textBox3.Text.Trim());
         }
 
         // ══════════════════════════════════════════════
-        //  LÀM MỚI
+        //  CÁC NÚT CHỨC NĂNG KHÁC
         // ══════════════════════════════════════════════
         private void btnLamMoi_Click(object sender, EventArgs e)
         {
             ResetForm();
             _trangHienTai = 1;
-            HienThiDanhSach(_dsSinhVien);
+            LoadData();
             DatTrangThaiForm(false);
         }
 
-        // ══════════════════════════════════════════════
-        //  TÌM KIẾM
-        // ══════════════════════════════════════════════
         private void btnTimKiem_Click(object sender, EventArgs e)
         {
-            string kw = textBox3.Text.Trim().ToLower();
-            if (string.IsNullOrEmpty(kw))
-            {
-                _trangHienTai = 1;
-                HienThiDanhSach(_dsSinhVien);
-                return;
-            }
-            var ketQua = _dsSinhVien
-                .Where(s => s.HoTen.ToLower().Contains(kw)
-                         || s.MaSV.Contains(kw)
-                         || s.Lop.ToLower().Contains(kw))
-                .ToList();
             _trangHienTai = 1;
-            HienThiDanhSach(ketQua);
+            LoadData(textBox3.Text.Trim());
         }
 
-        // ══════════════════════════════════════════════
-        //  PHÂN TRANG
-        // ══════════════════════════════════════════════
-        private void btnTrangDau_Click(object sender, EventArgs e)
-        { _trangHienTai = 1; HienThiDanhSach(_dsHienThi); }
-
-        private void btnTrangTruoc_Click(object sender, EventArgs e)
-        { if (_trangHienTai > 1) { _trangHienTai--; HienThiDanhSach(_dsHienThi); } }
-
-        private void btnTrangSau_Click(object sender, EventArgs e)
-        {
-            int tongTrang = (int)Math.Ceiling((double)_dsHienThi.Count / _soDoiMoiTrang);
-            if (_trangHienTai < tongTrang) { _trangHienTai++; HienThiDanhSach(_dsHienThi); }
-        }
-
-        private void btnTrangCuoi_Click(object sender, EventArgs e)
-        {
-            _trangHienTai = Math.Max(1, (int)Math.Ceiling((double)_dsHienThi.Count / _soDoiMoiTrang));
-            HienThiDanhSach(_dsHienThi);
-        }
+        private void btnTrangDau_Click(object sender, EventArgs e) { _trangHienTai = 1; LoadData(textBox3.Text.Trim()); }
+        private void btnTrangTruoc_Click(object sender, EventArgs e) { if (_trangHienTai > 1) { _trangHienTai--; LoadData(textBox3.Text.Trim()); } }
+        private void btnTrangSau_Click(object sender, EventArgs e) { _trangHienTai++; LoadData(textBox3.Text.Trim()); }
+        private void btnTrangCuoi_Click(object sender, EventArgs e) { _trangHienTai = int.MaxValue; LoadData(textBox3.Text.Trim()); }
 
         // ══════════════════════════════════════════════
         //  HELPER
@@ -260,25 +240,20 @@ namespace WindowsFormApp
             dateTimePicker1.Value = DateTime.Today;
             comboBox1.SelectedIndex = 0;
             if (comboBox2.Items.Count > 0) comboBox2.SelectedIndex = 0;
-            textBox3.Clear();
         }
 
-        /// <summary>
-        /// editing=true  → đang nhập liệu (ẩn Thêm/Sửa/Xóa/LàmMới, hiện Lưu)
-        /// editing=false → chế độ xem (hiện Thêm/Sửa/Xóa/LàmMới, ẩn Lưu)
-        /// </summary>
         private void DatTrangThaiForm(bool editing)
         {
-            textBox2.ReadOnly       = !editing;
-            comboBox1.Enabled       = editing;
+            textBox2.ReadOnly = !editing;
+            comboBox1.Enabled = editing;
             dateTimePicker1.Enabled = editing;
-            comboBox2.Enabled       = editing;
+            comboBox2.Enabled = editing;
 
-            button1.Visible  = !editing;   // Thêm
-            button2.Visible  = !editing;   // Sửa
-            button3.Visible  = !editing;   // Xóa
-            button4.Visible  = !editing;   // Làm mới
-            btnLuu.Visible   =  editing;   // Lưu
+            button1.Visible = !editing;   // Thêm
+            button2.Visible = !editing;   // Sửa
+            button3.Visible = !editing;   // Xóa
+            button4.Visible = !editing;   // Làm mới
+            btnLuu.Visible = editing;     // Lưu
         }
     }
 }
