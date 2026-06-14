@@ -104,7 +104,35 @@ namespace WindowsFormApp
             textBox2.Focus();
         }
 
-        private void btnXoa_Click(object sender, EventArgs e) { }
+        private void btnXoa_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(textBox1.Text))
+            {
+                MessageBox.Show("Vui lòng chọn sinh viên cần xóa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var ketQua = MessageBox.Show(
+                $"Bạn có chắc muốn xóa sinh viên có mã \"{textBox1.Text}\" không?",
+                "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (ketQua == DialogResult.Yes)
+            {
+                using (var db = new AppDbContext())
+                {
+                    var sv = db.SinhViens.Find(int.Parse(textBox1.Text));
+                    if (sv != null)
+                    {
+                        db.SinhViens.Remove(sv);
+                        db.SaveChanges();
+                    }
+                }
+                ResetForm();
+                LoadData();
+                DatTrangThaiForm(false);
+                MessageBox.Show("Xóa sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
 
         private void btnLuu_Click(object sender, EventArgs e)
         {
