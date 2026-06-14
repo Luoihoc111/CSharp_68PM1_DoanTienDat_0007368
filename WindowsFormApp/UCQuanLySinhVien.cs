@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -7,6 +8,12 @@ namespace WindowsFormApp
     public partial class UCQuanLySinhVien : UserControl
     {
         private bool _dangThem = false;
+
+        // ── Phân trang ────────────────────────────────
+        private List<SinhVien> _dsHienThi = new List<SinhVien>();
+        private int _trang    = 1;
+        private int _pageSize = 10;
+        private int SoTrangToi => (int)Math.Ceiling((double)_dsHienThi.Count / _pageSize);
 
         public UCQuanLySinhVien()
         {
@@ -38,20 +45,35 @@ namespace WindowsFormApp
         {
             using (var db = new AppDbContext())
             {
-                var dsSinhVien = db.SinhViens.OrderBy(s => s.id).ToList();
-
-                dataGridView1.Rows.Clear();
-                foreach (var sv in dsSinhVien)
-                {
-                    dataGridView1.Rows.Add(
-                        sv.id.ToString(),
-                        sv.hoten,
-                        sv.gioitinh,
-                        sv.ngaysinh?.ToString("dd/MM/yyyy") ?? "",
-                        sv.malop
-                    );
-                }
+                _dsHienThi = db.SinhViens.OrderBy(s => s.id).ToList();
             }
+            _trang = 1;
+            HienThiTrang();
+        }
+
+        // ══════════════════════════════════════════════
+        //  HIỂN THỊ TRANG HIỆN TẠI
+        // ══════════════════════════════════════════════
+        private void HienThiTrang()
+        {
+            dataGridView1.Rows.Clear();
+            var trangData = _dsHienThi
+                .Skip((_trang - 1) * _pageSize)
+                .Take(_pageSize);
+
+            foreach (var sv in trangData)
+            {
+                dataGridView1.Rows.Add(
+                    sv.id.ToString(),
+                    sv.hoten,
+                    sv.gioitinh,
+                    sv.ngaysinh?.ToString("dd/MM/yyyy") ?? "",
+                    sv.malop
+                );
+            }
+
+            int soTrang = SoTrangToi < 1 ? 1 : SoTrangToi;
+            label7.Text = $"Trang {_trang}/{soTrang}  |  {_dsHienThi.Count} bản ghi";
         }
 
         private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -187,12 +209,51 @@ namespace WindowsFormApp
             DatTrangThaiForm(false);
         }
 
-        private void btnTimKiem_Click(object sender, EventArgs e) { }
+        private void btnTimKiem_Click(object sender, EventArgs e)
+        {
+            string keyword = textBox3.Text.Trim().ToLower();
+            using (var db = new AppDbContext())
+            {
+                _dsHienThi = db.SinhViens
+                    .OrderBy(s => s.id)
+                    .ToList()
+                    .Where(s =>
+                        s.id.ToString().Contains(keyword) ||
+                        (s.hoten  ?? "").ToLower().Contains(keyword) ||
+                        (s.malop  ?? "").ToLower().Contains(keyword))
+                    .ToList();
+            }
+            _trang = 1;
+            HienThiTrang();
+        }
 
-        private void btnTrangDau_Click(object sender, EventArgs e) { }
-        private void btnTrangTruoc_Click(object sender, EventArgs e) { }
-        private void btnTrangSau_Click(object sender, EventArgs e) { }
-        private void btnTrangCuoi_Click(object sender, EventArgs e) { }
+        private void btnTrangDau_Click(object sender, EventArgs e)
+        {
+            if (_trang == 1) return;
+            _trang = 1;
+            HienThiTrang();
+        }
+
+        private void btnTrangTruoc_Click(object sender, EventArgs e)
+        {
+            if (_trang <= 1) return;
+            _trang--;
+            HienThiTrang();
+        }
+
+        private void btnTrangSau_Click(object sender, EventArgs e)
+        {
+            if (_trang >= SoTrangToi) return;
+            _trang++;
+            HienThiTrang();
+        }
+
+        private void btnTrangCuoi_Click(object sender, EventArgs e)
+        {
+            if (_trang == SoTrangToi) return;
+            _trang = SoTrangToi;
+            HienThiTrang();
+        }
 
         // ══════════════════════════════════════════════
         //  HELPER
