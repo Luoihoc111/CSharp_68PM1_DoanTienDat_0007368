@@ -91,7 +91,18 @@ namespace WindowsFormApp
             textBox2.Focus();
         }
 
-        private void btnSua_Click(object sender, EventArgs e) { }
+        private void btnSua_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(textBox1.Text))
+            {
+                MessageBox.Show("Vui lòng chọn sinh viên cần sửa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            _dangThem = false;
+            DatTrangThaiForm(true);
+            textBox1.ReadOnly = true;
+            textBox2.Focus();
+        }
 
         private void btnXoa_Click(object sender, EventArgs e) { }
 
@@ -118,6 +129,19 @@ namespace WindowsFormApp
                     db.SinhViens.Add(svMoi);
                     db.SaveChanges();
                     MessageBox.Show("Thêm sinh viên thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else // Sửa
+                {
+                    var sv = db.SinhViens.Find(int.Parse(textBox1.Text));
+                    if (sv != null)
+                    {
+                        sv.hoten    = textBox2.Text.Trim();
+                        sv.gioitinh = comboBox1.Text;
+                        sv.ngaysinh = dateTimePicker1.Value;
+                        sv.malop    = comboBox2.Text;
+                        db.SaveChanges();
+                        MessageBox.Show("Cập nhật thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                 }
             }
 
