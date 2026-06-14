@@ -32,15 +32,110 @@ namespace WindowsFormApp
             }
         }
 
-        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e) { }
+        private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
 
-        private void btnThem_Click(object sender, EventArgs e) { }
+            var row = dataGridView1.Rows[e.RowIndex];
+            txtMaLop.Text  = row.Cells[0].Value?.ToString();
+            txtTenLop.Text = row.Cells[1].Value?.ToString();
+            txtGhiChu.Text = row.Cells[2].Value?.ToString();
+        }
 
-        private void btnSua_Click(object sender, EventArgs e) { }
+        private void btnThem_Click(object sender, EventArgs e)
+        {
+            ResetForm();
+            txtMaLop.ReadOnly = false;
+            txtMaLop.Focus();
+            _dangThem = true;
+            DatTrangThaiForm(true);
+        }
 
-        private void btnXoa_Click(object sender, EventArgs e) { }
+        private void btnSua_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtMaLop.Text))
+            {
+                MessageBox.Show("Vui lòng chọn lớp học cần sửa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            _dangThem = false;
+            DatTrangThaiForm(true);
+            txtMaLop.ReadOnly = true;
+            txtTenLop.Focus();
+        }
 
-        private void btnLuu_Click(object sender, EventArgs e) { }
+        private void btnXoa_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtMaLop.Text))
+            {
+                MessageBox.Show("Vui lòng chọn lớp học cần xóa!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var ketQua = MessageBox.Show(
+                $"Bạn có chắc muốn xóa lớp \"{txtMaLop.Text}\" không?",
+                "Xác nhận xóa", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+
+            if (ketQua == DialogResult.Yes)
+            {
+                using (var db = new AppDbContext())
+                {
+                    var lop = db.LopHocs.FirstOrDefault(l => l.malop == txtMaLop.Text);
+                    if (lop != null)
+                    {
+                        db.LopHocs.Remove(lop);
+                        db.SaveChanges();
+                    }
+                }
+                ResetForm();
+                LoadData();
+                DatTrangThaiForm(false);
+                MessageBox.Show("Xóa lớp học thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void btnLuu_Click(object sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(txtMaLop.Text) || string.IsNullOrWhiteSpace(txtTenLop.Text))
+            {
+                MessageBox.Show("Vui lòng nhập đầy đủ Mã lớp và Tên lớp!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            using (var db = new AppDbContext())
+            {
+                if (_dangThem)
+                {
+                    if (db.LopHocs.Any(l => l.malop == txtMaLop.Text))
+                    {
+                        MessageBox.Show("Mã lớp đã tồn tại!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    db.LopHocs.Add(new LopHoc
+                    {
+                        malop  = txtMaLop.Text.Trim(),
+                        tenlop = txtTenLop.Text.Trim(),
+                        ghichu = txtGhiChu.Text.Trim()
+                    });
+                    db.SaveChanges();
+                    MessageBox.Show("Thêm lớp học thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else // Sửa
+                {
+                    var lop = db.LopHocs.FirstOrDefault(l => l.malop == txtMaLop.Text);
+                    if (lop != null)
+                    {
+                        lop.tenlop = txtTenLop.Text.Trim();
+                        lop.ghichu = txtGhiChu.Text.Trim();
+                        db.SaveChanges();
+                        MessageBox.Show("Cập nhật lớp học thành công!", "Thông báo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+
+            DatTrangThaiForm(false);
+            LoadData();
+        }
 
         // ══════════════════════════════════════════════
         //  CÁC NÚT CHỨC NĂNG KHÁC
