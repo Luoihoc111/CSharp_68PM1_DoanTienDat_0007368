@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -7,6 +8,12 @@ namespace WindowsFormApp
     public partial class UCQuanLyLopHoc : UserControl
     {
         private bool _dangThem = false;
+
+        // ── Phân trang ────────────────────────────────
+        private List<LopHoc> _dsHienThi = new List<LopHoc>();
+        private int _trang    = 1;
+        private int _pageSize = 10;
+        private int SoTrangToi => (int)Math.Ceiling((double)_dsHienThi.Count / _pageSize);
 
         public UCQuanLyLopHoc()
         {
@@ -22,14 +29,29 @@ namespace WindowsFormApp
         {
             using (var db = new AppDbContext())
             {
-                var dsLop = db.LopHocs.OrderBy(l => l.id).ToList();
-
-                dataGridView1.Rows.Clear();
-                foreach (var lop in dsLop)
-                {
-                    dataGridView1.Rows.Add(lop.malop, lop.tenlop, lop.ghichu);
-                }
+                _dsHienThi = db.LopHocs.OrderBy(l => l.id).ToList();
             }
+            _trang = 1;
+            HienThiTrang();
+        }
+
+        // ══════════════════════════════════════════════
+        //  HIỂN THỊ TRANG HIỆN TẠI
+        // ══════════════════════════════════════════════
+        private void HienThiTrang()
+        {
+            dataGridView1.Rows.Clear();
+            var trangData = _dsHienThi
+                .Skip((_trang - 1) * _pageSize)
+                .Take(_pageSize);
+
+            foreach (var lop in trangData)
+            {
+                dataGridView1.Rows.Add(lop.malop, lop.tenlop, lop.ghichu);
+            }
+
+            int soTrang = SoTrangToi < 1 ? 1 : SoTrangToi;
+            label7.Text = $"Trang {_trang}/{soTrang}  |  {_dsHienThi.Count} bản ghi";
         }
 
         private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -147,12 +169,50 @@ namespace WindowsFormApp
             DatTrangThaiForm(false);
         }
 
-        private void btnTimKiem_Click(object sender, EventArgs e) { }
+        private void btnTimKiem_Click(object sender, EventArgs e)
+        {
+            string keyword = txtTimKiem.Text.Trim().ToLower();
+            using (var db = new AppDbContext())
+            {
+                _dsHienThi = db.LopHocs
+                    .OrderBy(l => l.id)
+                    .ToList()
+                    .Where(l =>
+                        (l.malop  ?? "").ToLower().Contains(keyword) ||
+                        (l.tenlop ?? "").ToLower().Contains(keyword))
+                    .ToList();
+            }
+            _trang = 1;
+            HienThiTrang();
+        }
 
-        private void btnTrangDau_Click(object sender, EventArgs e) { }
-        private void btnTrangTruoc_Click(object sender, EventArgs e) { }
-        private void btnTrangSau_Click(object sender, EventArgs e) { }
-        private void btnTrangCuoi_Click(object sender, EventArgs e) { }
+        private void btnTrangDau_Click(object sender, EventArgs e)
+        {
+            if (_trang == 1) return;
+            _trang = 1;
+            HienThiTrang();
+        }
+
+        private void btnTrangTruoc_Click(object sender, EventArgs e)
+        {
+            if (_trang <= 1) return;
+            _trang--;
+            HienThiTrang();
+        }
+
+        private void btnTrangSau_Click(object sender, EventArgs e)
+        {
+            if (_trang >= SoTrangToi) return;
+            _trang++;
+            HienThiTrang();
+        }
+
+        private void btnTrangCuoi_Click(object sender, EventArgs e)
+        {
+            if (_trang == SoTrangToi) return;
+            _trang = SoTrangToi;
+            HienThiTrang();
+        }
 
         // ══════════════════════════════════════════════
         //  HELPER
